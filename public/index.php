@@ -40,6 +40,38 @@ $today_transfer = $byMethod['transfer'] ?? 0;
 // รวมทุกวิธี (เผื่อมี card/other)
 $today_rev = array_sum($byMethod);
 
+// ===== คำนวณยอดวันนี้ (ถ้ายังไม่มีตัวแยกวิธี) =====
+$today = today();
+
+$stm = $pdo->prepare("SELECT COALESCE(SUM(price),0) FROM bookings WHERE DATE(checkout_at)=?");
+$stm->execute([$today]);
+$today_rev = (float)$stm->fetchColumn();
+
+$stm = $pdo->prepare("SELECT COALESCE(SUM(price),0) FROM bookings WHERE DATE(checkout_at)=? AND payment_method='cash'");
+$stm->execute([$today]);
+$today_cash = (float)$stm->fetchColumn();
+
+$stm = $pdo->prepare("SELECT COALESCE(SUM(price),0) FROM bookings WHERE DATE(checkout_at)=? AND payment_method='transfer'");
+$stm->execute([$today]);
+$today_transfer = (float)$stm->fetchColumn();
+
+
+// ===== คำนวณยอดเดือนนี้ (รวม/เงินสด/โอน) =====
+$monthStart = date('Y-m-01');
+$monthEnd   = date('Y-m-t');
+
+$stm = $pdo->prepare("SELECT COALESCE(SUM(price),0) FROM bookings WHERE checkout_at IS NOT NULL AND DATE(checkout_at) BETWEEN ? AND ?");
+$stm->execute([$monthStart, $monthEnd]);
+$month_rev = (float)$stm->fetchColumn();
+
+$stm = $pdo->prepare("SELECT COALESCE(SUM(price),0) FROM bookings WHERE checkout_at IS NOT NULL AND DATE(checkout_at) BETWEEN ? AND ? AND payment_method='cash'");
+$stm->execute([$monthStart, $monthEnd]);
+$month_cash = (float)$stm->fetchColumn();
+
+$stm = $pdo->prepare("SELECT COALESCE(SUM(price),0) FROM bookings WHERE checkout_at IS NOT NULL AND DATE(checkout_at) BETWEEN ? AND ? AND payment_method='transfer'");
+$stm->execute([$monthStart, $monthEnd]);
+$month_transfer = (float)$stm->fetchColumn();
+
 // เปิดหน้า (มี <html> และ <body> อยู่ใน header.php แล้ว)
 include __DIR__ . '/../templates/header.php';
 ?>
@@ -66,8 +98,12 @@ include __DIR__ . '/../templates/header.php';
   </div>
 
   <!-- สรุปสถิติ (Cards) -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div class="relative overflow-hidden rounded-2xl bg-white shadow border border-emerald-200">
+<!-- สรุปสถิติ: ซ้ายซ้อน (ว่าง/ไม่ว่าง) + ขวาเป็นการ์ดรายได้ (เดือนใหญ่/วันเล็ก) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+  <!-- คอลัมน์ซ้าย: ซ้อนสองการ์ด -->
+  <div class="flex flex-col gap-4">
+    <!-- ห้องว่าง -->
+    <div class="relative overflow-hidden rounded-2xl bg-white shadow border border-emerald-200 flex-1">
       <div class="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-50"></div>
       <div class="p-4">
         <div class="flex items-center justify-between">
@@ -81,7 +117,8 @@ include __DIR__ . '/../templates/header.php';
       </div>
     </div>
 
-    <div class="relative overflow-hidden rounded-2xl bg-white shadow border border-amber-200">
+    <!-- ห้องไม่ว่าง -->
+    <div class="relative overflow-hidden rounded-2xl bg-white shadow border border-amber-200 flex-1">
       <div class="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-amber-50"></div>
       <div class="p-4">
         <div class="flex items-center justify-between">
@@ -94,40 +131,66 @@ include __DIR__ . '/../templates/header.php';
         <div class="mt-1 text-xs text-amber-700/70">กำลังมีผู้เข้าพัก</div>
       </div>
     </div>
+  </div>
 
-    <div class="relative overflow-hidden rounded-2xl bg-white shadow border border-sky-200">
-  <div class="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-50"></div>
-  <div class="p-4">
-    <div class="flex items-center justify-between">
-      <div class="text-gray-500">รายได้วันนี้ (ตามเช็คเอาท์)</div>
-      <div class="rounded-full p-2 bg-sky-100 text-sky-700">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 1.12-3 2.5S10.343 13 12 13s3 1.12 3 2.5S13.657 18 12 18m0-10V6m0 12v-2"/>
-        </svg>
+  <!-- คอลัมน์ขวา: การ์ดรายได้ (เดือนใหญ่ / วันนี้เล็ก) -->
+  <div class="relative overflow-hidden rounded-2xl bg-white shadow border border-sky-200 h-full">
+    <div class="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-50"></div>
+    <div class="p-4">
+      <div class="flex items-center justify-between">
+        <div class="text-gray-500">รายได้</div>
+        <div class="rounded-full p-2 bg-sky-100 text-sky-700">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 1.12-3 2.5S10.343 13 12 13s3 1.12 3 2.5S13.657 18 12 18m0-10V6m0 12v-2"/>
+          </svg>
+        </div>
       </div>
-    </div>
 
-    <!-- รวมทั้งหมด -->
-    <div class="mt-2 text-3xl font-semibold text-sky-700">
-      <?php echo format_baht($today_rev); ?> ฿
-    </div>
-    <div class="mt-1 text-xs text-sky-700/70">อัปเดตเมื่อ <?php echo date('H:i'); ?> น.</div>
-
-    <!-- แยกตามวิธีชำระ -->
-    <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
-      <div class="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
-        <span class="text-emerald-700">เงินสด</span>
-        <span class="font-semibold text-emerald-800"><?php echo format_baht($today_cash); ?> ฿</span>
+      <!-- รายเดือน: ใหญ่ -->
+      <div class="mt-2">
+        <div class="text-xs uppercase tracking-wide text-sky-700/70">
+          รวมเดือนนี้ (<?php echo date('M Y'); ?>)
+        </div>
+        <div class="mt-1 text-4xl font-extrabold text-sky-700 leading-tight">
+          <?php echo format_baht($month_rev); ?> ฿
+        </div>
+        <div class="mt-2 grid grid-cols-2 gap-2 text-sm">
+          <div class="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+            <span class="text-emerald-700">เงินสด (เดือน)</span>
+            <span class="font-semibold text-emerald-800"><?php echo format_baht($month_cash); ?> ฿</span>
+          </div>
+          <div class="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-2">
+            <span class="text-sky-700">โอน (เดือน)</span>
+            <span class="font-semibold text-sky-800"><?php echo format_baht($month_transfer); ?> ฿</span>
+          </div>
+        </div>
       </div>
-      <div class="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-2">
-        <span class="text-sky-700">โอน</span>
-        <span class="font-semibold text-sky-800"><?php echo format_baht($today_transfer); ?> ฿</span>
+
+      <!-- คั่น -->
+      <div class="my-3 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
+
+      <!-- รายวัน: เล็ก -->
+      <div class="mt-1">
+        <div class="text-[11px] uppercase tracking-wide text-sky-700/70">
+          วันนี้ (อัปเดต <?php echo date('H:i'); ?> น.)
+        </div>
+        <div class="mt-1 text-xl font-semibold text-sky-700">
+          <?php echo format_baht($today_rev); ?> ฿
+        </div>
+        <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+          <div class="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/50 px-2.5 py-1.5">
+            <span class="text-emerald-700">เงินสด</span>
+            <span class="font-semibold text-emerald-800"><?php echo format_baht($today_cash); ?> ฿</span>
+          </div>
+          <div class="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/50 px-2.5 py-1.5">
+            <span class="text-sky-700">โอน</span>
+            <span class="font-semibold text-sky-800"><?php echo format_baht($today_transfer); ?> ฿</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </div>
-
-  </div>
 
   <!-- หัวข้อห้อง + sticky sub-toolbar -->
   <div class="sticky top-0 z-10 -mx-2 px-2 pt-2 bg-gray-50/60 backdrop-blur supports-[backdrop-filter]:bg-gray-50/40">
