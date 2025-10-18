@@ -34,7 +34,7 @@ try{
   $pdo->beginTransaction();
 
   if ($booking['type']==='temp'){
-    $hrs   = Pricing::ceilHours($booking['checkin_at'], $checkout_at);
+    $hrs = Pricing::ceilHours($booking['checkin_at'], $checkout_at, 5); // เกณฑ์ 5 นาที
     $price = Pricing::tempByHours($hrs);
 
     // ฟรี 1 ชม. ทุกครั้งที่ 10 ตามเบอร์

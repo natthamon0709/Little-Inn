@@ -16,6 +16,29 @@ $rooms       = $roomRepo->all();
 $vacant      = $roomRepo->countVacant();
 $occ         = $roomRepo->countOccupied();
 $today_rev   = $bookingRepo->revenueOnDate(today());
+$today       = today();
+
+
+// ดึงยอดรายได้วันนี้ แยกตาม payment_method
+$stmt = $pdo->prepare("
+  SELECT payment_method, COALESCE(SUM(price),0) AS total
+  FROM bookings
+  WHERE DATE(checkout_at) = ?
+  GROUP BY payment_method
+");
+$stmt->execute([$today]);
+$byMethod = ['cash'=>0, 'transfer'=>0, 'card'=>0, 'other'=>0, ''=>0];
+
+foreach($stmt as $row){
+  $pm = $row['payment_method'] ?? '';
+  $byMethod[$pm] = (float)$row['total'];
+}
+
+$today_cash     = $byMethod['cash']     ?? 0;
+$today_transfer = $byMethod['transfer'] ?? 0;
+
+// รวมทุกวิธี (เผื่อมี card/other)
+$today_rev = array_sum($byMethod);
 
 // เปิดหน้า (มี <html> และ <body> อยู่ใน header.php แล้ว)
 include __DIR__ . '/../templates/header.php';
@@ -73,18 +96,37 @@ include __DIR__ . '/../templates/header.php';
     </div>
 
     <div class="relative overflow-hidden rounded-2xl bg-white shadow border border-sky-200">
-      <div class="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-50"></div>
-      <div class="p-4">
-        <div class="flex items-center justify-between">
-          <div class="text-gray-500">รายได้วันนี้ (ตามเช็คเอาท์)</div>
-          <div class="rounded-full p-2 bg-sky-100 text-sky-700">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 1.12-3 2.5S10.343 13 12 13s3 1.12 3 2.5S13.657 18 12 18m0-10V6m0 12v-2"/></svg>
-          </div>
-        </div>
-        <div class="mt-2 text-3xl font-semibold text-sky-700"><?php echo format_baht($today_rev); ?> ฿</div>
-        <div class="mt-1 text-xs text-sky-700/70">อัปเดตเมื่อ <?php echo date('H:i'); ?> น.</div>
+  <div class="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-50"></div>
+  <div class="p-4">
+    <div class="flex items-center justify-between">
+      <div class="text-gray-500">รายได้วันนี้ (ตามเช็คเอาท์)</div>
+      <div class="rounded-full p-2 bg-sky-100 text-sky-700">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 1.12-3 2.5S10.343 13 12 13s3 1.12 3 2.5S13.657 18 12 18m0-10V6m0 12v-2"/>
+        </svg>
       </div>
     </div>
+
+    <!-- รวมทั้งหมด -->
+    <div class="mt-2 text-3xl font-semibold text-sky-700">
+      <?php echo format_baht($today_rev); ?> ฿
+    </div>
+    <div class="mt-1 text-xs text-sky-700/70">อัปเดตเมื่อ <?php echo date('H:i'); ?> น.</div>
+
+    <!-- แยกตามวิธีชำระ -->
+    <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
+      <div class="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+        <span class="text-emerald-700">เงินสด</span>
+        <span class="font-semibold text-emerald-800"><?php echo format_baht($today_cash); ?> ฿</span>
+      </div>
+      <div class="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-2">
+        <span class="text-sky-700">โอน</span>
+        <span class="font-semibold text-sky-800"><?php echo format_baht($today_transfer); ?> ฿</span>
+      </div>
+    </div>
+  </div>
+</div>
+
   </div>
 
   <!-- หัวข้อห้อง + sticky sub-toolbar -->
@@ -156,13 +198,16 @@ include __DIR__ . '/../templates/header.php';
                   <small class="text-xs text-gray-500">ใส่ 10 หลัก ระบบจะฟอร์แมตให้อัตโนมัติ</small>
                 </label>
 
-                  <label class="block">
+                  <div class="block">
                     <span class="text-sm font-medium text-gray-700">เวลาเช็คอิน</span>
-                    <input type="datetime-local" name="checkin_at" value="<?php echo date('Y-m-d\\TH:i'); ?>"
-                           class="mt-1 w-full h-11 rounded-xl border-2 border-gray-300 bg-white/90 shadow-inner
-                                  text-gray-900
-                                  focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500">
-                  </label>
+                    <div class="mt-1 h-11 flex items-center rounded-xl border-2 border-gray-200 bg-gray-50 px-3">
+                      <span class="live-now-th text-gray-900 font-medium">—</span>
+                    </div>
+                    <!-- ค่านี้จะถูก JS อัปเดตเป็นรูปแบบที่เซิร์ฟเวอร์อ่านได้ -->
+                    <input type="hidden" name="checkin_at" id="auto-checkin-<?php echo (int)$r['id']; ?>" data-autonow="1">
+                    <p class="text-xs text-gray-500 mt-1">ระบบจะใช้เวลาปัจจุบันอัตโนมัติขณะกด Check-in</p>
+                  </div>
+
                 </div>
 
                 <label class="block">

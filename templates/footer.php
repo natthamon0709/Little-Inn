@@ -2,10 +2,6 @@
   </div><!-- /content wrapper -->
 
   <footer class="mt-auto bg-emerald-700 text-emerald-50 relative z-10">
-    <!-- <div class="max-w-7xl mx-auto px-4 py-6 text-center text-sm">
-      <div class="mb-1 font-medium">ระบบบริหารห้องพัก Little Inn</div>
-      <div class="opacity-80">© <?php echo date('Y'); ?> Little Inn • v1.0</div>
-    </div> -->
   </footer>
 
   <script>
@@ -18,6 +14,39 @@
     const btnClose = document.getElementById('btnSidebarClose');
     const iconMenu = document.getElementById('iconMenu');
     const iconClose= document.getElementById('iconClose');
+
+    const thMonths = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+  const pad = n => String(n).padStart(2,'0');
+
+  // แสดงผลสำหรับคนดู: "12 ต.ค. 2568 14:23:05"
+  function formatThaiDateTime(d){
+    const y = d.getFullYear() + 543;
+    return `${d.getDate()} ${thMonths[d.getMonth()]} ${y} ` +
+           `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  // ค่าที่ส่งไปเซิร์ฟเวอร์ใน hidden input: "YYYY-MM-DD HH:MM:SS"
+  function toServerDateTime(d){
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ` +
+           `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function tick(){
+    const now = new Date();
+
+    // อัปเดตข้อความแสดงผล (ไทย)
+    document.querySelectorAll('.live-now-th').forEach(el=>{
+      el.textContent = formatThaiDateTime(now);
+    });
+
+    // อัปเดต hidden input name="checkin_at"
+    document.querySelectorAll('input[name="checkin_at"][data-autonow]').forEach(inp=>{
+      inp.value = toServerDateTime(now);
+    });
+  }
+
+  tick();
+  setInterval(tick, 1000);
 
     // ป้องกัน null
     if(!sidebar || !content || !btn || !iconMenu || !iconClose){
