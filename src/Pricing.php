@@ -29,9 +29,17 @@ class Pricing
     }
 
     /** ราคาเหมาจ่ายชั่วคราวตามชั่วโมงที่คิดได้ */
-    public static function tempByHours(int $hours): int
+    public static function tempByHours(int $hours, int $roomId = 0): int
     {
-        return 130 + max(0, $hours - 1) * 60;
+        // กันค่าผิดพลาด: น้อยสุดนับเป็น 1 ชั่วโมง
+        $h = max(1, $hours);
+
+        $isSpecial = in_array($roomId, [6, 7, 8], true);
+
+        $base = $isSpecial ? 160 : 130;  // เริ่มต้น: ห้องพิเศษ 160, ห้องปกติ 130
+        $step = $isSpecial ? 70  : 60;   // เพิ่มต่อชั่วโมง: ห้องพิเศษ +70, ห้องปกติ +60
+
+        return $base + max(0, $h - 1) * $step;
     }
 
     /**
