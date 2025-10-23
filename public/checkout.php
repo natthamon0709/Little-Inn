@@ -35,7 +35,8 @@ try{
 
   if ($booking['type']==='temp'){
     $hrs = Pricing::ceilHours($booking['checkin_at'], $checkout_at, 5); // เกณฑ์ 5 นาที
-    $price = Pricing::tempByHours($hrs);
+    // $price = Pricing::tempByHours($hrs);
+    $price = Pricing::tempByHours($hrs, (int)($booking['room_id'] ?? 0));
 
     // ฟรี 1 ชม. ทุกครั้งที่ 10 ตามเบอร์
     $phone = $booking['phone'] ?? '';
