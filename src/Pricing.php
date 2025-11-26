@@ -34,7 +34,7 @@ class Pricing
         // กันค่าผิดพลาด: น้อยสุดนับเป็น 1 ชั่วโมง
         $h = max(1, $hours);
 
-        $isSpecial = in_array($roomId, [6, 7, 8], true);
+        $isSpecial = in_array($roomId, [4, 5, 6, 7, 8], true);
 
         $base = $isSpecial ? 160 : 130;  // เริ่มต้น: ห้องพิเศษ 160, ห้องปกติ 130
         $step = $isSpecial ? 70  : 60;   // เพิ่มต่อชั่วโมง: ห้องพิเศษ +70, ห้องปกติ +60
@@ -49,7 +49,7 @@ class Pricing
     public static function overnightByCheckin(string $checkin, int $roomId = 0): int
     {
         $t = (int)date('Hi', strtotime($checkin));
-        $isSpecial = in_array($roomId, [6,7,8], true);
+        $isSpecial = in_array($roomId, [4, 5, 6, 7, 8], true);
 
         // เรต "หลัง 4 ทุ่ม" (22:00-23:59) และ 00:00-11:59
         if ($t >= 2200 || $t < 1200) {
